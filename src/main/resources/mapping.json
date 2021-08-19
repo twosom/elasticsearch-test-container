@@ -1,0 +1,92 @@
+{
+  "properties": {
+    "movieCd": {
+      "type": "long"
+    },
+    "prdtStatNm": {
+      "type": "text",
+      "fields": {
+        "keyword": {
+          "ignore_above": 256,
+          "type": "keyword"
+        }
+      }
+    },
+
+    "prdtYear": {
+      "type": "long"
+    },
+    "repNationNm": {
+      "type": "text",
+      "fields": {
+        "keyword": {
+          "ignore_above": 256,
+          "type": "keyword"
+        }
+      }
+    },
+    "typeNm": {
+      "type": "text",
+      "fields": {
+        "keyword": {
+          "ignore_above": 256,
+          "type": "keyword"
+        }
+      }
+    },
+    "openDt": {
+      "type": "text",
+      "fields": {
+        "keyword": {
+          "ignore_above": 256,
+          "type": "keyword"
+        }
+      }
+    },
+    "nationAlt": {
+      "type": "text",
+      "fields": {
+        "keyword": {
+          "ignore_above": 256,
+          "type": "keyword"
+        }
+      }
+    },
+    "repGenreNm": {
+      "type": "text",
+      "fields": {
+        "keyword": {
+          "ignore_above": 256,
+          "type": "keyword"
+        }
+      }
+    },
+    "genreAlt": {
+      "type": "text",
+      "fields": {
+        "keyword": {
+          "ignore_above": 256,
+          "type": "keyword"
+        }
+      }
+    },
+    "movieNm": {
+      "type": "text",
+      "fields": {
+        "keyword": {
+          "ignore_above": 256,
+          "type": "keyword"
+        }
+      }
+    },
+    "movieNmEn": {
+      "type": "text",
+      "fields": {
+        "keyword": {
+          "ignore_above": 256,
+          "type": "keyword"
+        }
+      }
+    }
+  }
+}
