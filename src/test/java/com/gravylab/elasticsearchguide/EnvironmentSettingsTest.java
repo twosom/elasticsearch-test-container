@@ -1,11 +1,8 @@
 package com.gravylab.elasticsearchguide;
 
-import org.apache.http.HttpHost;
-import org.apache.http.auth.AuthScope;
-import org.apache.http.auth.UsernamePasswordCredentials;
-import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.elasticsearch.action.admin.cluster.health.ClusterHealthRequest;
 import org.elasticsearch.action.admin.cluster.health.ClusterHealthResponse;
+import org.elasticsearch.action.admin.indices.delete.DeleteIndexRequest;
 import org.elasticsearch.action.delete.DeleteRequest;
 import org.elasticsearch.action.delete.DeleteResponse;
 import org.elasticsearch.action.get.GetRequest;
@@ -14,28 +11,21 @@ import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.action.search.SearchRequest;
 import org.elasticsearch.action.search.SearchResponse;
+import org.elasticsearch.action.support.master.AcknowledgedResponse;
 import org.elasticsearch.client.RequestOptions;
-import org.elasticsearch.client.RestClient;
-import org.elasticsearch.client.RestClientBuilder;
-import org.elasticsearch.client.RestHighLevelClient;
 import org.elasticsearch.client.indices.CreateIndexRequest;
 import org.elasticsearch.client.indices.CreateIndexResponse;
 import org.elasticsearch.client.indices.GetIndexRequest;
 import org.elasticsearch.client.indices.GetIndexResponse;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentFactory;
-import org.elasticsearch.search.aggregations.AggregationBuilders;
 import org.elasticsearch.search.aggregations.bucket.MultiBucketsAggregation;
 import org.elasticsearch.search.aggregations.bucket.terms.ParsedStringTerms;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.elasticsearch.ElasticsearchContainer;
-import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -43,43 +33,10 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import static org.elasticsearch.index.query.QueryBuilders.termsQuery;
-import static org.elasticsearch.search.aggregations.AggregationBuilders.*;
+import static org.elasticsearch.search.aggregations.AggregationBuilders.terms;
 
 @Testcontainers
-public class EnvironmentSettingsTest {
-
-
-    @Container
-    static ElasticsearchContainer container =
-            new ElasticsearchContainer(DockerImageName.parse("docker.elastic.co/elasticsearch/elasticsearch:7.12.0"))
-                    .withEnv("cluster.name", "javacafe-cluster")
-                    .withEnv("node.name", "javacafe-node1")
-                    .withEnv("network.host", "0.0.0.0")
-            ;
-    RestHighLevelClient client;
-
-
-    @BeforeEach
-    void beforeEach() {
-        this.client = getRestClient();
-    }
-
-    @AfterEach
-    void afterEach() throws IOException {
-        client.close();
-    }
-
-
-    private RestHighLevelClient getRestClient() {
-        BasicCredentialsProvider credentialProvider = new BasicCredentialsProvider();
-        credentialProvider.setCredentials(AuthScope.ANY,
-                new UsernamePasswordCredentials("elasticsearch", "elasticsearch"));
-        RestClientBuilder builder = RestClient.builder(HttpHost.create(container.getHttpHostAddress()))
-                .setHttpClientConfigCallback(
-                        httpClientBuilder -> httpClientBuilder.setDefaultCredentialsProvider(credentialProvider)
-                );
-        return new RestHighLevelClient(builder);
-    }
+public class EnvironmentSettingsTest extends CommonTestClass {
 
 
     @DisplayName("가상 테스트 컨테이너에서 정상 작동하는지 확인하는 테스트")
@@ -138,6 +95,9 @@ public class EnvironmentSettingsTest {
     @DisplayName("movie 인덱스 생성")
     @Test
     void create_movie_index() throws IOException {
+        removeIndexIfExists("movie");
+
+
         CreateIndexRequest createIndexRequest = new CreateIndexRequest("movie");
 
         XContentBuilder settingBuilder = makeSettingBuilder();
@@ -150,11 +110,10 @@ public class EnvironmentSettingsTest {
     }
 
 
-
     @DisplayName("문서 생성하기")
     @Test
     void create_new_document() throws IOException, InterruptedException {
-        if (!isExistIndex("movie")) {
+        if (!isExistsIndex("movie")) {
             this.create_movie_index();
         }
 
@@ -178,7 +137,8 @@ public class EnvironmentSettingsTest {
 
         IndexResponse indexResponse = client.index(indexRequest, RequestOptions.DEFAULT);
         System.err.println("indexResponse = " + indexResponse);
-        Thread.sleep(1000L);;
+        Thread.sleep(1000L);
+        ;
     }
 
 
@@ -260,15 +220,7 @@ public class EnvironmentSettingsTest {
         searchRequest.source(searchSourceBuilder);
 
         searchResponse = client.search(searchRequest, RequestOptions.DEFAULT);
-        System.out.println("result = " + result);
-    }
-
-
-
-
-    private boolean isExistIndex(String index) throws IOException {
-        GetIndexRequest getIndexRequest = new GetIndexRequest(index);
-        return client.indices().exists(getIndexRequest, RequestOptions.DEFAULT);
+        System.out.println("searchResponse = " + searchResponse);
     }
 
 
@@ -293,7 +245,7 @@ public class EnvironmentSettingsTest {
                 defineField(mappingBuilder, "prdtYear", "integer");
                 defineField(mappingBuilder, "openDt", "date");
                 defineField(mappingBuilder, "typeNm", "keyword");
-                defineField(mappingBuilder, "prdtStatNm","keyword");
+                defineField(mappingBuilder, "prdtStatNm", "keyword");
                 defineField(mappingBuilder, "nationAlt", "keyword");
                 defineField(mappingBuilder, "genreAlt", "keyword");
                 defineField(mappingBuilder, "repNationNm", "keyword");
