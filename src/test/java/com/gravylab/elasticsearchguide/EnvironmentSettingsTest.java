@@ -2,7 +2,6 @@ package com.gravylab.elasticsearchguide;
 
 import org.elasticsearch.action.admin.cluster.health.ClusterHealthRequest;
 import org.elasticsearch.action.admin.cluster.health.ClusterHealthResponse;
-import org.elasticsearch.action.admin.indices.delete.DeleteIndexRequest;
 import org.elasticsearch.action.delete.DeleteRequest;
 import org.elasticsearch.action.delete.DeleteResponse;
 import org.elasticsearch.action.get.GetRequest;
@@ -11,7 +10,6 @@ import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.action.search.SearchRequest;
 import org.elasticsearch.action.search.SearchResponse;
-import org.elasticsearch.action.support.master.AcknowledgedResponse;
 import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.indices.CreateIndexRequest;
 import org.elasticsearch.client.indices.CreateIndexResponse;
@@ -22,7 +20,6 @@ import org.elasticsearch.common.xcontent.XContentFactory;
 import org.elasticsearch.search.aggregations.bucket.MultiBucketsAggregation;
 import org.elasticsearch.search.aggregations.bucket.terms.ParsedStringTerms;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -43,7 +40,7 @@ public class EnvironmentSettingsTest extends CommonTestClass {
     @Test
     void test_rest_client() throws Exception {
         ClusterHealthRequest clusterHealthRequest = new ClusterHealthRequest();
-        ClusterHealthResponse health = client.cluster().health(clusterHealthRequest, RequestOptions.DEFAULT);
+        ClusterHealthResponse health = testContainerClient.cluster().health(clusterHealthRequest, RequestOptions.DEFAULT);
         System.out.println("health = " + health);
     }
 
@@ -57,7 +54,7 @@ public class EnvironmentSettingsTest extends CommonTestClass {
                 .settings(settings);
 
 
-        CreateIndexResponse createIndexResponse = client.indices().create(createIndexRequest, RequestOptions.DEFAULT);
+        CreateIndexResponse createIndexResponse = testContainerClient.indices().create(createIndexRequest, RequestOptions.DEFAULT);
         System.out.println("createIndexResponse = " + createIndexResponse);
     }
 
@@ -82,12 +79,12 @@ public class EnvironmentSettingsTest extends CommonTestClass {
         indexRequest.index("movie")
                 .source(source);
 
-        IndexResponse indexResponse = client.index(indexRequest, RequestOptions.DEFAULT);
+        IndexResponse indexResponse = testContainerClient.index(indexRequest, RequestOptions.DEFAULT);
         System.err.println(indexResponse.toString());
 
         GetIndexRequest getIndexRequest = new GetIndexRequest("movie");
 
-        GetIndexResponse getIndexResponse = client.indices().get(getIndexRequest, RequestOptions.DEFAULT);
+        GetIndexResponse getIndexResponse = testContainerClient.indices().get(getIndexRequest, RequestOptions.DEFAULT);
         System.out.println("getIndexResponse = " + getIndexResponse);
     }
 
@@ -105,7 +102,7 @@ public class EnvironmentSettingsTest extends CommonTestClass {
         createIndexRequest.settings(settingBuilder);
         createIndexRequest.mapping(mappingBuilder);
 
-        CreateIndexResponse createIndexResponse = client.indices().create(createIndexRequest, RequestOptions.DEFAULT);
+        CreateIndexResponse createIndexResponse = testContainerClient.indices().create(createIndexRequest, RequestOptions.DEFAULT);
         System.out.println(createIndexResponse.isAcknowledged());
     }
 
@@ -113,7 +110,7 @@ public class EnvironmentSettingsTest extends CommonTestClass {
     @DisplayName("문서 생성하기")
     @Test
     void create_new_document() throws IOException, InterruptedException {
-        if (!isExistsIndex("movie")) {
+        if (!isExistsIndex("movie", testContainerClient)) {
             this.create_movie_index();
         }
 
@@ -135,7 +132,7 @@ public class EnvironmentSettingsTest extends CommonTestClass {
         indexRequest.source(source)
                 .id(String.valueOf(1));
 
-        IndexResponse indexResponse = client.index(indexRequest, RequestOptions.DEFAULT);
+        IndexResponse indexResponse = testContainerClient.index(indexRequest, RequestOptions.DEFAULT);
         System.err.println("indexResponse = " + indexResponse);
         Thread.sleep(1000L);
         ;
@@ -148,7 +145,7 @@ public class EnvironmentSettingsTest extends CommonTestClass {
         create_new_document();
 
         GetRequest getRequest = new GetRequest("movie", "1");
-        GetResponse getResponse = client.get(getRequest, RequestOptions.DEFAULT);
+        GetResponse getResponse = testContainerClient.get(getRequest, RequestOptions.DEFAULT);
         System.err.println(getResponse.getSourceAsMap());
     }
 
@@ -157,7 +154,7 @@ public class EnvironmentSettingsTest extends CommonTestClass {
     void remove_document() throws IOException, InterruptedException {
         create_new_document();
         DeleteRequest deleteRequest = new DeleteRequest("movie", "1");
-        DeleteResponse deleteResponse = client.delete(deleteRequest, RequestOptions.DEFAULT);
+        DeleteResponse deleteResponse = testContainerClient.delete(deleteRequest, RequestOptions.DEFAULT);
         System.err.println("deleteResponse = " + deleteResponse);
     }
 
@@ -173,7 +170,7 @@ public class EnvironmentSettingsTest extends CommonTestClass {
         );
         searchRequest.source(searchSourceBuilder);
 
-        SearchResponse searchResponse = client.search(searchRequest, RequestOptions.DEFAULT);
+        SearchResponse searchResponse = testContainerClient.search(searchRequest, RequestOptions.DEFAULT);
         System.err.println("searchResponse = " + searchResponse);
     }
 
@@ -192,7 +189,7 @@ public class EnvironmentSettingsTest extends CommonTestClass {
                 );
 
         searchRequest.source(searchSourceBuilder);
-        SearchResponse searchResponse = client.search(searchRequest, RequestOptions.DEFAULT);
+        SearchResponse searchResponse = testContainerClient.search(searchRequest, RequestOptions.DEFAULT);
 
         Map<Object, Long> result = searchResponse
                 .getAggregations()
@@ -219,7 +216,7 @@ public class EnvironmentSettingsTest extends CommonTestClass {
         );
         searchRequest.source(searchSourceBuilder);
 
-        searchResponse = client.search(searchRequest, RequestOptions.DEFAULT);
+        searchResponse = testContainerClient.search(searchRequest, RequestOptions.DEFAULT);
         System.out.println("searchResponse = " + searchResponse);
     }
 

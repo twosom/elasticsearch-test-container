@@ -1,0 +1,3 @@
+Elasticsearch, 엘라스틱서치
+Harry => 해리
+Potter => 포터

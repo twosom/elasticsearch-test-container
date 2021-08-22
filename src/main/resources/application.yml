@@ -1,1 +1,4 @@
-
+server:
+  tomcat:
+    max-swallow-size: 200MB
+    max-http-form-post-size: 200MB
