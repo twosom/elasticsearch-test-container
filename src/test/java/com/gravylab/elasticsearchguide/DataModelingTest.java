@@ -8,11 +8,15 @@ import org.elasticsearch.action.DocWriteRequest;
 import org.elasticsearch.action.admin.indices.delete.DeleteIndexRequest;
 import org.elasticsearch.action.bulk.BulkRequest;
 import org.elasticsearch.action.bulk.BulkResponse;
+import org.elasticsearch.action.get.GetRequest;
+import org.elasticsearch.action.get.GetResponse;
 import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.action.search.SearchRequest;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.action.support.master.AcknowledgedResponse;
+import org.elasticsearch.action.update.UpdateRequest;
+import org.elasticsearch.action.update.UpdateResponse;
 import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.indices.*;
 import org.elasticsearch.common.unit.TimeValue;
@@ -37,14 +41,14 @@ import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import static org.elasticsearch.index.query.QueryBuilders.*;
 import static org.elasticsearch.search.aggregations.AggregationBuilders.terms;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
-public class MappingTest extends CommonTestClass {
+public class DataModelingTest extends CommonTestClass {
 
 
     public static final String NUMBER_OF_SHARDS = "number_of_shards";
@@ -1603,6 +1607,60 @@ public class MappingTest extends CommonTestClass {
 
         BulkByScrollResponse bulkByScrollResponse = testContainerClient.deleteByQuery(deleteByQueryRequest, RequestOptions.DEFAULT);
         System.out.println("bulkByScrollResponse = " + bulkByScrollResponse);
+    }
+
+
+    @DisplayName("Update API")
+    @Test
+    void update_api() throws Exception {
+        IndexRequest indexRequest = new IndexRequest("movie_dynamic");
+        Map<String, Object> source = new HashMap<>();
+        source.put("counter", 1000);
+        source.put("movieNmEn", "Last Child");
+
+        indexRequest.id("1")
+                .source(source);
+        IndexResponse indexResponse = testContainerClient.index(indexRequest, RequestOptions.DEFAULT);
+        assertEquals("1", indexResponse.getId());
+        Thread.sleep(2000);
+
+
+        UpdateRequest updateRequest = new UpdateRequest("movie_dynamic", "1");
+        Map<String, Object> params = new HashMap<>();
+        params.put("count", 1);
+        Script script = new Script(ScriptType.INLINE, "painless", "ctx._source.counter += params.count", params);
+
+        updateRequest.script(script);
+
+        UpdateResponse updateResponse = testContainerClient.update(updateRequest, RequestOptions.DEFAULT);
+        System.out.println("updateResponse = " + updateResponse);
+
+
+        GetRequest getRequest = new GetRequest("movie_dynamic", "1");
+        GetResponse getResponse = testContainerClient.get(getRequest, RequestOptions.DEFAULT);
+        assertEquals(1001, getResponse.getSourceAsMap().get("counter"));
+    }
+
+
+    @DisplayName("Bulk API")
+    @Test
+    void bulk_api() throws Exception {
+        BulkRequest bulkRequest = new BulkRequest();
+        AtomicInteger i = new AtomicInteger(1);
+        List.of("살아남은 아이", "해리포터와 비밀의 방", "어벤저스")
+                .forEach(e -> {
+                    IndexRequest indexRequest = new IndexRequest("movie_dynamic")
+                            .id(String.valueOf(i.getAndIncrement()))
+                            .source(Map.of("title", e));
+                    bulkRequest.add(indexRequest);
+                });
+
+
+        BulkResponse bulk = testContainerClient.bulk(bulkRequest, RequestOptions.DEFAULT);
+        boolean result = Arrays.stream(bulk.getItems())
+                .allMatch(e -> e.getOpType().equals(DocWriteRequest.OpType.INDEX));
+        assertTrue(result);
+
     }
 
 

@@ -37,7 +37,10 @@ public class CommonTestClass {
                     .withEnv("cluster.name", "javacafe-cluster")
                     .withEnv("node.name", "javacafe-node1")
                     .withEnv("network.host", "0.0.0.0")
-                    .withClasspathResourceMapping("synonym.txt", "/usr/share/elasticsearch/config/synonym.txt", BindMode.READ_ONLY);
+                    .withEnv("path.repo", "/usr/share/elasticsearch/backup")
+                    .withClasspathResourceMapping("synonym.txt", "/usr/share/elasticsearch/config/synonym.txt", BindMode.READ_ONLY)
+                    .withClasspathResourceMapping("search_example", "/usr/share/elasticsearch/backup", BindMode.READ_WRITE)
+            ;
     ;
 
 
@@ -56,8 +59,10 @@ public class CommonTestClass {
     @BeforeEach
     void beforeEach() {
         this.testContainerClient = getTestContainerRestClient();
-
         this.dockerClient = getDockerRestClient();
+
+
+
     }
 
     private RestHighLevelClient getDockerRestClient() {
