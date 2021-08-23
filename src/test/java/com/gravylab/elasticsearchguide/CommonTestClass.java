@@ -39,7 +39,8 @@ public class CommonTestClass {
                     .withEnv("network.host", "0.0.0.0")
                     .withEnv("path.repo", "/usr/share/elasticsearch/backup")
                     .withClasspathResourceMapping("synonym.txt", "/usr/share/elasticsearch/config/synonym.txt", BindMode.READ_ONLY)
-                    .withClasspathResourceMapping("search_example", "/usr/share/elasticsearch/backup", BindMode.READ_WRITE)
+                    .withClasspathResourceMapping("search_example", "/usr/share/elasticsearch/backup/search", BindMode.READ_WRITE)
+                    .withClasspathResourceMapping("agg_example", "/usr/share/elasticsearch/backup/agg", BindMode.READ_WRITE)
             ;
     ;
 
@@ -54,6 +55,7 @@ public class CommonTestClass {
         //TODO 프로젝트의 resources 디렉토리에 있는 synonym.txt 를 테스트 컨테이너로 옮기는 작업
         container.execInContainer("mkdir", ELASTICSEARCH_ANALYSIS_DIRECTORY);
         container.execInContainer("mv", "/usr/share/elasticsearch/config/synonym.txt", ELASTICSEARCH_ANALYSIS_DIRECTORY);
+        container.execInContainer("/usr/share/elasticsearch/bin/elasticsearch-plugin install mapper-murmur3");
     }
 
     @BeforeEach

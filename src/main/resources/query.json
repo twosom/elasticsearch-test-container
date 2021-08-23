@@ -1,0 +1,29 @@
+{
+  "query": {
+    "constant_score": {
+      "filter": {
+        "match": {
+          "geoip.city_name": {
+            "query": "Paris",
+            "operator": "OR",
+            "prefix_length": 0,
+            "max_expansions": 50,
+            "fuzzy_transpositions": true,
+            "lenient": false,
+            "zero_terms_query": "NONE",
+            "auto_generate_synonyms_phrase_query": true,
+            "boost": 1.0
+          }
+        }
+      },
+      "boost": 1.0
+    }
+  },
+  "aggregations": {
+    "total_bytes": {
+      "sum": {
+        "field": "bytes"
+      }
+    }
+  }
+}

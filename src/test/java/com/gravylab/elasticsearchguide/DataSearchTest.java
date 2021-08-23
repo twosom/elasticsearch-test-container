@@ -39,9 +39,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.stream.Collectors;
 
-import static java.util.stream.Collectors.*;
+import static java.util.stream.Collectors.toMap;
 import static org.elasticsearch.index.query.QueryBuilders.*;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -61,7 +60,7 @@ public class DataSearchTest extends CommonTestClass {
         //TODO 스냅샷 용 리파지토리 생성
         PutRepositoryRequest putRepositoryRequest = new PutRepositoryRequest();
         Settings.Builder settings = Settings.builder()
-                .put("location", "/usr/share/elasticsearch/backup")
+                .put("location", "/usr/share/elasticsearch/backup/search")
                 .put("compress", true);
         putRepositoryRequest.settings(settings)
                 .name("javacafe")
