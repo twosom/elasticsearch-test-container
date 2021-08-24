@@ -16,6 +16,9 @@ import org.elasticsearch.script.Script;
 import org.elasticsearch.script.ScriptType;
 import org.elasticsearch.search.aggregations.Aggregation;
 import org.elasticsearch.search.aggregations.bucket.MultiBucketsAggregation;
+import org.elasticsearch.search.aggregations.bucket.histogram.DateHistogramInterval;
+import org.elasticsearch.search.aggregations.bucket.histogram.ParsedDateHistogram;
+import org.elasticsearch.search.aggregations.bucket.histogram.ParsedHistogram;
 import org.elasticsearch.search.aggregations.bucket.range.ParsedDateRange;
 import org.elasticsearch.search.aggregations.bucket.range.ParsedRange;
 import org.elasticsearch.search.aggregations.bucket.terms.ParsedStringTerms;
@@ -32,6 +35,8 @@ import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
 import static org.elasticsearch.index.query.QueryBuilders.*;
 import static org.elasticsearch.search.aggregations.AggregationBuilders.*;
+import static org.elasticsearch.search.aggregations.PipelineAggregatorBuilders.derivative;
+import static org.elasticsearch.search.aggregations.PipelineAggregatorBuilders.maxBucket;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class AggregationTest extends CommonTestClass {
@@ -689,6 +694,158 @@ public class AggregationTest extends CommonTestClass {
         printAggregation(searchRequest, "request count with date range");
     }
 
+    //TODO 히스토그램 집계(Histogram Aggregations) 는 숫자 범위를 처리하기 위한 집계다.
+    // 지정한 범위 내에서 집계를 수행하는 범위 집계와는 달리 지정한 수치가 간격을 나타내고, 이 간격의 범위 내에서 집계를 수행한다.
+    @DisplayName("히스토그램 집계")
+    @Test
+    void aggregation_with_histogram() throws Exception {
+        restore_snapshot();
+        SearchRequest searchRequest = new SearchRequest(APACHE_WEB_LOG)
+                .source(
+                        new SearchSourceBuilder()
+                                .size(0)
+                                .aggregation(
+                                        histogram("bytes_histogram")
+                                                .field("bytes")
+                                                .interval(10000)
+                                )
+                );
+        printAggregation(searchRequest, "bytes_histogram");
+    }
+
+    //TODO 위의 결과를 보면 문서 개수가 0인 간격도 포함되 있다.
+    // 만약 문서가 존재하지 않는 구간은 필요하지 않다면 아래와 같이 촤소 문서 수(min_doc_count) 를 설정해서 해당 구간을 제외시킬 수 있다.
+    @DisplayName("히스토그램에 최소 문서 수 설정")
+    @Test
+    void aggregation_with_histogram_and_min_doc_count() throws Exception {
+        restore_snapshot();
+        SearchRequest searchRequest = new SearchRequest(APACHE_WEB_LOG)
+                .source(
+                        new SearchSourceBuilder()
+                                .size(0)
+                                .aggregation(
+                                        histogram("bytes_histogram")
+                                                .field("bytes")
+                                                .interval(10000)
+                                                .minDocCount(1)
+                                )
+                );
+        printAggregation(searchRequest, "bytes_histogram");
+    }
+
+
+    //TODO 날짜 히스토그램 집계(Date Histogram Aggregation) 는 다중 버킷 집계에 속하며 히스토글매 집계와 유사하다.
+    // 히스토그램 집계는 숫자 값을 간격으로 삼아 집계를 수행한 반면 날짜 히스토그램 집계는 분, 시간, 월, 연도를 구간으로 집계를 수행할 수 있다.
+    // 분 단위로 얼마만큼의 사용자 유입이 있었는지 확인해보기 위해 다음과 같이 집계를 수행해 보았다.
+    @DisplayName("날짜 히스토그램 집계")
+    @Test
+    void aggregation_with_date_histogram() throws Exception {
+        restore_snapshot();
+        SearchRequest searchRequest = new SearchRequest(APACHE_WEB_LOG)
+                .source(
+                        new SearchSourceBuilder()
+                                .size(0)
+                                .aggregation(
+                                        dateHistogram("daily_request_count")
+                                                .field("timestamp")
+                                                .calendarInterval(DateHistogramInterval.MINUTE)
+                                )
+                );
+        printAggregation(searchRequest, "daily_request_count");
+    }
+
+    @DisplayName("날짜 히스토그램 날짜 방식 변경")
+    @Test
+    void aggregation_with_date_histogram_change_date_type() throws Exception {
+        restore_snapshot();
+        SearchRequest searchRequest = new SearchRequest(APACHE_WEB_LOG)
+                .source(
+                        new SearchSourceBuilder()
+                                .size(0)
+                                .aggregation(
+                                        dateHistogram("daily_request_count")
+                                                .field("timestamp")
+                                                .calendarInterval(DateHistogramInterval.DAY)
+                                                .format("yyyy-MM-dd")
+                                )
+                );
+
+        printAggregation(searchRequest, "daily_request_count");
+    }
+
+
+    //TODO 텀즈 집계(Terms Aggregation) 는 버킷이 동적으로 생성되는 다중 버킷 집계다.
+    // 집계 시 지정한 필드에 대해 빈도수가 높은 텀의 순위로 결과가 반환된다.
+    // 이를 통해 가장 많이 접속하는 사용자를 알아낸다거나 국가별로 어느 정도의 빈도로 서버에 접속하는지 등의 집계를 수행할 수 있다.
+    // 텀즈 집계를 통해 아파치 서버로 얼마만큼의 요청이 들어왔는지를 국가별로 집계해보자.
+    @DisplayName("텀즈 집계")
+    @Test
+    void aggregation_with_term() throws Exception {
+        restore_snapshot();
+        SearchRequest searchRequest = new SearchRequest(APACHE_WEB_LOG)
+                .source(
+                        new SearchSourceBuilder()
+                                .size(0)
+                                .aggregation(
+                                        terms("request count by country")
+                                                .field("geoip.country_name.keyword")
+                                                .size(100)
+                                )
+                );
+
+        printAggregation(searchRequest, "request count by country");
+    }
+
+    @DisplayName("파이프라인 집계")
+    @Test
+    void aggregation_with_pipeline() throws Exception {
+        restore_snapshot();
+        SearchRequest searchRequest = new SearchRequest(APACHE_WEB_LOG)
+                .source(
+                        new SearchSourceBuilder()
+                                .size(0)
+                                .aggregation(
+                                        dateHistogram("histo")
+                                                .field("timestamp")
+                                                .calendarInterval(DateHistogramInterval.MINUTE)
+                                                .subAggregation(
+                                                        sum("bytes_sum")
+                                                                .field("bytes")
+                                                )
+                                )
+                                .aggregation(
+                                        maxBucket("max_bytes", "histo>bytes_sum")
+                                ));
+
+        SearchResponse searchResponse = testContainerClient.search(searchRequest, RequestOptions.DEFAULT);
+        System.err.println("searchResponse = " + searchResponse);
+    }
+
+    @DisplayName("파생 집계")
+    @Test
+    void aggregation_with_derivative() throws Exception {
+        restore_snapshot();
+        SearchRequest searchRequest = new SearchRequest(APACHE_WEB_LOG)
+                .source(
+                        new SearchSourceBuilder()
+                                .size(0)
+                                .aggregation(
+                                        dateHistogram("histo")
+                                                .field("timestamp")
+                                                .calendarInterval(DateHistogramInterval.DAY)
+                                                .subAggregation(
+                                                        sum("bytes_sum")
+                                                                .field("bytes")
+                                                )
+                                                .subAggregation(
+                                                        derivative("sum_deriv", "bytes_sum")
+                                                )
+                                )
+                );
+        SearchResponse searchResponse = testContainerClient.search(searchRequest, RequestOptions.DEFAULT);
+        System.out.println("searchResponse = " + searchResponse);
+    }
+
 
     private Script createScript(String script, Map<String, Object> params) {
         return new Script(ScriptType.INLINE, "painless", script, params);
@@ -734,12 +891,31 @@ public class AggregationTest extends CommonTestClass {
             case "ParsedDateRange":
                 printParsedDateRange(aggregation);
                 break;
+            case "ParsedHistogram":
+                printParsedHistogram(aggregation);
+                break;
+            case "ParsedDateHistogram":
+                printParsedDateHistogram(aggregation);
+                break;
             default:
                 printSingleValue(aggregation);
                 break;
         }
 
 
+    }
+
+    private void printParsedDateHistogram(Aggregation aggregation) {
+        ((ParsedDateHistogram) aggregation)
+                .getBuckets()
+                .forEach(e -> System.err.println(e.getKeyAsString() + " : " + e.getDocCount()));
+
+    }
+
+    private void printParsedHistogram(Aggregation aggregation) {
+        ((ParsedHistogram) aggregation)
+                .getBuckets()
+                .forEach(e -> System.err.println(e.getKey() + " : " + e.getDocCount()));
     }
 
     private void printParsedDateRange(Aggregation aggregation) {
@@ -809,14 +985,9 @@ public class AggregationTest extends CommonTestClass {
     }
 
     private void printParsedStringTerms(Aggregation aggregation) {
-        ParsedStringTerms parsedStringTerms = (ParsedStringTerms) aggregation;
-        Map<Object, Long> map = parsedStringTermsToMap(parsedStringTerms);
-        long sumOfOtherDocCounts = parsedStringTerms.getSumOfOtherDocCounts();
-        long docCountError = parsedStringTerms.getDocCountError();
-        System.err.println("sumOfOtherDocCounts = " + sumOfOtherDocCounts);
-        System.err.println("docCountError = " + docCountError);
-        map.entrySet()
-                .forEach(System.err::println);
+        ((ParsedStringTerms) aggregation)
+                .getBuckets()
+                .forEach(e -> System.err.println(e.getKey() + " : " + e.getDocCount()));
     }
 
     private Map<Object, Long> parsedStringTermsToMap(ParsedStringTerms aggregation) {

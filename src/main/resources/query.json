@@ -1,29 +1,32 @@
 {
-  "query": {
-    "constant_score": {
-      "filter": {
-        "match": {
-          "geoip.city_name": {
-            "query": "Paris",
-            "operator": "OR",
-            "prefix_length": 0,
-            "max_expansions": 50,
-            "fuzzy_transpositions": true,
-            "lenient": false,
-            "zero_terms_query": "NONE",
-            "auto_generate_synonyms_phrase_query": true,
-            "boost": 1.0
+  "size": 0,
+  "aggregations": {
+    "histo": {
+      "date_histogram": {
+        "field": "timestamp",
+        "calendar_interval": "1d",
+        "offset": 0,
+        "order": {
+          "_key": "asc"
+        },
+        "keyed": false,
+        "min_doc_count": 0
+      },
+      "aggregations": {
+        "bytes_sum": {
+          "sum": {
+            "field": "bytes"
+          }
+        },
+        "sum_deriv": {
+          "derivative": {
+            "buckets_path": [
+              "bytes_sum"
+            ],
+            "gap_policy": "skip"
           }
         }
-      },
-      "boost": 1.0
-    }
-  },
-  "aggregations": {
-    "total_bytes": {
-      "sum": {
-        "field": "bytes"
       }
     }
   }
-}
+}}
