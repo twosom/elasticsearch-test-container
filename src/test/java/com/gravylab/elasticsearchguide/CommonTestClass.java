@@ -31,6 +31,8 @@ public class CommonTestClass {
 
 
     public static final String ELASTICSEARCH_ANALYSIS_DIRECTORY = "/usr/share/elasticsearch/config/analysis";
+    public static final String NUMBER_OF_SHARDS = "number_of_shards";
+    public static final String NUMBER_OF_REPLICAS = "number_of_replicas";
     @Container
     static ElasticsearchContainer container =
             new ElasticsearchContainer(DockerImageName.parse("docker.elastic.co/elasticsearch/elasticsearch:7.12.0"))
@@ -55,7 +57,6 @@ public class CommonTestClass {
         //TODO 프로젝트의 resources 디렉토리에 있는 synonym.txt 를 테스트 컨테이너로 옮기는 작업
         container.execInContainer("mkdir", ELASTICSEARCH_ANALYSIS_DIRECTORY);
         container.execInContainer("mv", "/usr/share/elasticsearch/config/synonym.txt", ELASTICSEARCH_ANALYSIS_DIRECTORY);
-        container.execInContainer("/usr/share/elasticsearch/bin/elasticsearch-plugin install mapper-murmur3");
     }
 
     @BeforeEach
@@ -113,10 +114,10 @@ public class CommonTestClass {
 
     }
 
-    protected void removeIndexIfExists(String index) throws IOException {
-        if (isExistsIndex(index, testContainerClient)) {
+    protected void removeIndexIfExists(String index, RestHighLevelClient client) throws IOException {
+        if (isExistsIndex(index, client)) {
             DeleteIndexRequest deleteIndexRequest = new DeleteIndexRequest(index);
-            AcknowledgedResponse deleteResponse = testContainerClient.indices().delete(deleteIndexRequest, RequestOptions.DEFAULT);
+            AcknowledgedResponse deleteResponse = client.indices().delete(deleteIndexRequest, RequestOptions.DEFAULT);
             Assertions.assertTrue(deleteResponse.isAcknowledged());
             System.out.println("[" + index + "] 인덱스 삭제가 완료되었습니다.");
         }

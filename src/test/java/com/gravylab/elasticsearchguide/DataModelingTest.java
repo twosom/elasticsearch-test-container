@@ -60,7 +60,7 @@ public class DataModelingTest extends CommonTestClass {
     @DisplayName("매핑 실패 테스트")
     @Test
     void mapping_fail_test() throws IOException {
-        removeIndexIfExists("movie");
+        removeIndexIfExists("movie", testContainerClient);
         CreateIndexRequest createIndexRequest = new CreateIndexRequest("movie");
         CreateIndexResponse createIndexResponse = testContainerClient.indices().create(createIndexRequest, RequestOptions.DEFAULT);
 
@@ -88,7 +88,7 @@ public class DataModelingTest extends CommonTestClass {
     @DisplayName("인덱스 생성")
     @Test
     void create_index_test() throws IOException {
-        removeIndexIfExists(MOVIE_SEARCH);
+        removeIndexIfExists(MOVIE_SEARCH, testContainerClient);
 
         CreateIndexRequest createIndexRequest = new CreateIndexRequest(MOVIE_SEARCH);
         XContentBuilder settingBuilder = createSettingBuilder();
@@ -354,7 +354,7 @@ public class DataModelingTest extends CommonTestClass {
             index_for_aggregation();
         }
 
-        removeIndexIfExists("reindex_petitions");
+        removeIndexIfExists("reindex_petitions", testContainerClient);
 
 
         ReindexRequest reindexRequest = new ReindexRequest();
@@ -849,7 +849,7 @@ public class DataModelingTest extends CommonTestClass {
     @DisplayName("색인과 검색 시 분석기를 각각 설정")
     @Test
     void create_index_with_analyzer_aggregated() throws Exception {
-        removeIndexIfExists("movie_analyzer");
+        removeIndexIfExists("movie_analyzer", testContainerClient);
 
         CreateIndexRequest createIndexRequest = new CreateIndexRequest("movie_analyzer");
         XContentBuilder builder = XContentFactory.jsonBuilder();

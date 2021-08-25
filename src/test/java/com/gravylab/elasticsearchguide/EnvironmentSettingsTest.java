@@ -92,7 +92,7 @@ public class EnvironmentSettingsTest extends CommonTestClass {
     @DisplayName("movie 인덱스 생성")
     @Test
     void create_movie_index() throws IOException {
-        removeIndexIfExists("movie");
+        removeIndexIfExists("movie", testContainerClient);
 
 
         CreateIndexRequest createIndexRequest = new CreateIndexRequest("movie");
