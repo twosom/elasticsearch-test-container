@@ -1,13 +1,36 @@
 package com.gravylab.elasticsearchguide;
 
-import org.elasticsearch.action.support.master.AcknowledgedResponse;
+import org.elasticsearch.action.admin.cluster.storedscripts.PutStoredScriptRequest;
+import org.elasticsearch.action.get.GetRequest;
+import org.elasticsearch.action.get.GetResponse;
+import org.elasticsearch.action.index.IndexRequest;
+import org.elasticsearch.action.index.IndexResponse;
+import org.elasticsearch.action.search.SearchRequest;
+import org.elasticsearch.action.search.SearchResponse;
+import org.elasticsearch.action.update.UpdateRequest;
+import org.elasticsearch.action.update.UpdateResponse;
 import org.elasticsearch.client.RequestOptions;
-import org.elasticsearch.client.indices.*;
+import org.elasticsearch.client.indices.AnalyzeRequest;
+import org.elasticsearch.client.indices.AnalyzeResponse;
+import org.elasticsearch.client.indices.CreateIndexRequest;
+import org.elasticsearch.client.indices.CreateIndexResponse;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentFactory;
+import org.elasticsearch.script.Script;
+import org.elasticsearch.script.ScriptType;
+import org.elasticsearch.script.mustache.SearchTemplateRequest;
+import org.elasticsearch.search.SearchHit;
+import org.elasticsearch.search.builder.SearchSourceBuilder;
+import org.elasticsearch.search.fetch.subphase.highlight.HighlightBuilder;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+
+import static org.elasticsearch.index.query.QueryBuilders.matchQuery;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -21,10 +44,13 @@ public class KoreanAnalyzerTest extends CommonTestClass {
     public static final String DECOMPOUND_MODE = "decompound_mode";
     public static final String ANALYZER_NAME = "nori_token_analyzer";
     public static final String NORI_PART_OF_SPEECH = "nori_part_of_speech";
+    public static final String NORI_READINGFORM = "nori_readingform";
+    public static final String MOVIE_HIGHLIGHTING = "movie_highlighting";
+    public static final String MOVIE_SCRIPT = "movie_script";
 
     @DisplayName("인덱스 생성 시 사용자 정의사전 추가")
     @Test
-     void index_with_user_dictionary() throws Exception {
+    void index_with_user_dictionary() throws Exception {
         if (isExistsIndex(INDEX_NAME, dockerClient)) {
             return;
         }
@@ -85,96 +111,195 @@ public class KoreanAnalyzerTest extends CommonTestClass {
 
     }
 
-    @DisplayName("앞서 생성한 인덱스에 토큰 필터 정보 추가하기")
+    @DisplayName("nori_readingform 토큰 필터")
     @Test
-    void add_token_filter() throws Exception {
-        index_with_user_dictionary();
-        CloseIndexRequest closeIndexRequest = new CloseIndexRequest(INDEX_NAME);
-        CloseIndexResponse closeIndexResponse = dockerClient.indices().close(closeIndexRequest, RequestOptions.DEFAULT);
-        assertTrue(closeIndexResponse.isAcknowledged());
+    void analyze_with_nori_readingform() throws Exception {
+        removeIndexIfExists(NORI_READINGFORM, dockerClient);
 
         XContentBuilder builder = XContentFactory.jsonBuilder();
         builder.startObject();
         {
             builder.startObject("analysis");
             {
-
                 builder.startObject("analyzer");
                 {
-                    builder.startObject("nori_stoptags_analyzer");
+                    builder.startObject("nori_readingform_analyzer");
                     {
                         builder.field("tokenizer", "nori_tokenizer");
                         builder.startArray("filter");
                         {
-                            builder.value("nori_posfilter");
+                            builder.value("nori_readingform");
                         }
                         builder.endArray();
                     }
                     builder.endObject();
                 }
                 builder.endObject();
-
-
-                builder.startObject("filter");
-                {
-                    builder.startObject("nori_posfilter");
-                    {
-                        builder.field("type", NORI_PART_OF_SPEECH);
-                        builder.startArray("stoptags");
-                        {
-                            builder.value("E")
-                                    .value("IC")
-                                    .value("J")
-                                    .value("MAG")
-                                    .value("MAJ")
-                                    .value("MAJ")
-                                    .value("MM")
-                                    .value("NA")
-                                    .value("NR")
-                                    .value("SC")
-                                    .value("SE")
-                                    .value("SF")
-                                    .value("SH")
-                                    .value("SL")
-                                    .value("SN")
-                                    .value("SP")
-                                    .value("SSC")
-                                    .value("SSO")
-                                    .value("SY")
-                                    .value("UNA")
-                                    .value("UNKNOWN")
-                                    .value("VA")
-                                    .value("VCN")
-                                    .value("VCP")
-                                    .value("VSV")
-                                    .value("VV")
-                                    .value("VX")
-                                    .value("XPN")
-                                    .value("XR")
-                                    .value("XSA")
-                                    .value("XSN")
-                                    .value("XSV");
-                        }
-                        builder.endArray();
-
-                    }
-                    builder.endObject();
-                }
-                builder.endObject();
-
-
             }
             builder.endObject();
         }
         builder.endObject();
 
+        CreateIndexRequest createIndexRequest = new CreateIndexRequest(NORI_READINGFORM)
+                .settings(builder);
 
-        PutMappingRequest putMappingRequest = new PutMappingRequest(INDEX_NAME)
-                .source(builder);
+        CreateIndexResponse createIndexResponse = dockerClient.indices().create(createIndexRequest, RequestOptions.DEFAULT);
+
+        //TODO 위에서 생성한 분석기를 통해 테스트
+
+        AnalyzeRequest analyzeRequest = AnalyzeRequest.withIndexAnalyzer(NORI_READINGFORM, "nori_readingform_analyzer", "中國");
+        AnalyzeResponse analyzeResponse = dockerClient.indices().analyze(analyzeRequest, RequestOptions.DEFAULT);
+        analyzeResponse.getTokens()
+                .stream()
+                .map(AnalyzeResponse.AnalyzeToken::getTerm)
+                .forEach(System.err::println);
+    }
 
 
-        AcknowledgedResponse putMappingResponse = dockerClient.indices().putMapping(putMappingRequest, RequestOptions.DEFAULT);
-        assertTrue(putMappingResponse.isAcknowledged());
+    @DisplayName("하이라이팅 기능")
+    @Test
+    void search_with_highlighting() throws Exception {
+        removeIndexIfExists(MOVIE_HIGHLIGHTING, dockerClient);
+        //TODO 하이라이트 기능을 테스트하기 위한 데이터 생성
+        Map<String, Object> source = new HashMap<String, Object>();
+        source.put("title", "Harry Potter and the Deathly Hallows");
+        IndexRequest indexRequest = new IndexRequest()
+                .index(MOVIE_HIGHLIGHTING)
+                .source(source);
+        dockerClient.index(indexRequest, RequestOptions.DEFAULT);
+
+        Thread.sleep(2000);
+
+        //TODO 데이터를 검색할 때 Highlight 옵션을 이용해 하이라이트를 수행할 필드를 지정하면 검색 결과로 하이라이트된 데이터의 일부가 함께 리턴된다.
+        HighlightBuilder.Field title = new HighlightBuilder.Field("title");
+        HighlightBuilder field = new HighlightBuilder()
+                .field(title);
+
+        SearchRequest searchRequest = new SearchRequest(MOVIE_HIGHLIGHTING)
+                .source(
+                        new SearchSourceBuilder()
+                                .query(
+                                        matchQuery("title", "harry")
+                                                .queryName("query")
+                                )
+                                .highlighter(field)
+                );
+
+        printHighlight(searchRequest);
+    }
+
+    private void printHighlight(SearchRequest searchRequest) throws IOException {
+        SearchResponse searchResponse = dockerClient.search(searchRequest, RequestOptions.DEFAULT);
+        Arrays.stream(searchResponse
+                        .getInternalResponse()
+                        .hits()
+                        .getHits())
+                .map(SearchHit::getHighlightFields)
+                .forEach(System.err::println);
+    }
+
+    @DisplayName("하이라이트 태그 변경")
+    @Test
+    void change_highlight_tag() throws Exception {
+        removeIndexIfExists(MOVIE_HIGHLIGHTING, dockerClient);
+        //TODO 하이라이트 기능을 테스트하기 위한 데이터 생성
+        Map<String, Object> source = new HashMap<String, Object>();
+        source.put("title", "Harry Potter and the Deathly Hallows");
+        IndexRequest indexRequest = new IndexRequest()
+                .index(MOVIE_HIGHLIGHTING)
+                .source(source);
+        dockerClient.index(indexRequest, RequestOptions.DEFAULT);
+
+        Thread.sleep(2000);
+
+        SearchRequest searchRequest = new SearchRequest(MOVIE_HIGHLIGHTING)
+                .source(
+                        new SearchSourceBuilder()
+                                .query(
+                                        matchQuery("title", "harry")
+                                                .queryName("query")
+                                )
+                );
+
+
+        searchRequest
+                .source()
+                .highlighter(
+                        new HighlightBuilder()
+                                .field(new HighlightBuilder.Field("title"))
+                )
+                .highlighter()
+                .preTags("<strong>")
+                .postTags("</strong>")
+        ;
+
+
+        printHighlight(searchRequest);
+    }
+
+
+    @DisplayName("스크립팅을 인덱스 생성")
+    @Test
+    void index_for_scripting() throws Exception {
+        removeIndexIfExists(MOVIE_SCRIPT, dockerClient);
+
+        HashMap<String, Object> source = new HashMap<>();
+        source.put("movieList",
+                Map.of(
+                        "Death_With", 5.5,
+                        "About_Time", 7,
+                        "Suits", 3.5
+                )
+        );
+        IndexRequest indexRequest = new IndexRequest(MOVIE_SCRIPT)
+                .id("1")
+                .source(source);
+
+        dockerClient.index(indexRequest, RequestOptions.DEFAULT);
+        Thread.sleep(1500);
+    }
+
+
+    @DisplayName("스크립팅을 이용한 필드 추가")
+    @Test
+    void add_field_using_script() throws Exception {
+        index_for_scripting();
+        UpdateRequest updateRequest = new UpdateRequest(MOVIE_SCRIPT, "1")
+                .script(
+                        new Script(ScriptType.INLINE, "painless", "ctx._source.movieList.Black_Panther = 3.7", new HashMap<>())
+                );
+
+        dockerClient.update(updateRequest, RequestOptions.DEFAULT);
+
+        GetRequest getRequest = new GetRequest(MOVIE_SCRIPT, "1");
+
+        GetResponse getResponse = dockerClient.get(getRequest, RequestOptions.DEFAULT);
+        getResponse.getSourceAsMap()
+                .entrySet()
+                .forEach(System.err::println);
+    }
+
+    @DisplayName("스크립팅을 이용한 필드 제거")
+    @Test
+    void remove_field_using_script() throws Exception {
+        index_for_scripting();
+        UpdateRequest updateRequest = new UpdateRequest(MOVIE_SCRIPT, "1")
+                .script(
+                        new Script(ScriptType.INLINE, "painless", "ctx._source.movieList.remove(\"Suits\")", new HashMap<>())
+                );
+
+        dockerClient.update(updateRequest, RequestOptions.DEFAULT);
+        GetRequest getRequest = new GetRequest(MOVIE_SCRIPT, "1");
+        GetResponse getResponse = dockerClient.get(getRequest, RequestOptions.DEFAULT);
+
+        getResponse.getSourceAsMap()
+                .entrySet()
+                .forEach(System.err::println);
+    }
+
+    @DisplayName("Script API 를 이용해 검색 엔진 템플릿을 위한 템플릿 생성")
+    @Test
+    void create_template_using_script_api() throws Exception {
 
     }
 
