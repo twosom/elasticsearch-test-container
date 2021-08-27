@@ -8,6 +8,8 @@ import org.elasticsearch.action.admin.cluster.snapshots.get.GetSnapshotsRequest;
 import org.elasticsearch.action.admin.cluster.snapshots.get.GetSnapshotsResponse;
 import org.elasticsearch.action.admin.cluster.snapshots.restore.RestoreSnapshotRequest;
 import org.elasticsearch.action.admin.cluster.snapshots.restore.RestoreSnapshotResponse;
+import org.elasticsearch.action.admin.indices.alias.IndicesAliasesRequest;
+import org.elasticsearch.action.admin.indices.alias.get.GetAliasesRequest;
 import org.elasticsearch.action.admin.indices.validate.query.ValidateQueryRequest;
 import org.elasticsearch.action.admin.indices.validate.query.ValidateQueryResponse;
 import org.elasticsearch.action.explain.ExplainRequest;
@@ -21,11 +23,13 @@ import org.elasticsearch.client.core.CountRequest;
 import org.elasticsearch.client.core.CountResponse;
 import org.elasticsearch.client.indices.CreateIndexRequest;
 import org.elasticsearch.client.indices.CreateIndexResponse;
+import org.elasticsearch.client.indices.DeleteAliasRequest;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.unit.Fuzziness;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentFactory;
 import org.elasticsearch.index.query.Operator;
+import org.elasticsearch.index.reindex.ReindexRequest;
 import org.elasticsearch.repositories.fs.FsRepository;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.SearchHits;
@@ -829,6 +833,50 @@ public class DataSearchTest extends CommonTestClass {
                         e -> e.getValue().getQueryProfileResults().get(0).getQueryResults().get(0).getTime()))
                 .entrySet()
                 .forEach(System.err::println);
+    }
+
+
+    @DisplayName("reindex API 를 사용하 movie_info 인덱스 생성")
+    @Test
+    void reindex_movie_info_index() throws Exception {
+        GetAliasesRequest getAliasesRequest = new GetAliasesRequest("movie");
+        boolean exists = testContainerClient.indices().existsAlias(getAliasesRequest, RequestOptions.DEFAULT);
+        if (exists) {
+            DeleteAliasRequest deleteAliasRequest = new DeleteAliasRequest("movie_search", "movie");
+            org.elasticsearch.client.core.AcknowledgedResponse acknowledgedResponse = dockerClient.indices().deleteAlias(deleteAliasRequest, RequestOptions.DEFAULT);
+            assertTrue(acknowledgedResponse.isAcknowledged());
+        }
+        restore_snapshot();
+
+
+        ReindexRequest reindexRequest = new ReindexRequest()
+                .setSourceIndices(MOVIE_SEARCH)
+                .setDestIndex("movie_info");
+
+        testContainerClient.reindex(reindexRequest, RequestOptions.DEFAULT);
+
+        //TODO 인덱스가 만들어지면 _aliases 를 통해 두 인덱스를 movie 라는 별칭으로 만들기
+        IndicesAliasesRequest indicesAliasesRequest = new IndicesAliasesRequest();
+
+        IndicesAliasesRequest.AliasActions action1 = new IndicesAliasesRequest.AliasActions(IndicesAliasesRequest.AliasActions.Type.ADD)
+                .index(MOVIE_SEARCH)
+                .alias("movie");
+
+        IndicesAliasesRequest.AliasActions action2 = new IndicesAliasesRequest.AliasActions(IndicesAliasesRequest.AliasActions.Type.ADD)
+                .index("movie_info")
+                .alias("movie");
+
+
+        indicesAliasesRequest.addAliasAction(action1)
+                .addAliasAction(action2);
+
+        AcknowledgedResponse acknowledgedResponse = testContainerClient.indices().updateAliases(indicesAliasesRequest, RequestOptions.DEFAULT);
+        assertTrue(acknowledgedResponse.isAcknowledged());
+
+
+        SearchRequest searchRequest = new SearchRequest("movie");
+        SearchResponse searchResponse = dockerClient.search(searchRequest, RequestOptions.DEFAULT);
+        System.out.println("searchResponse = " + searchResponse);
     }
 
 }

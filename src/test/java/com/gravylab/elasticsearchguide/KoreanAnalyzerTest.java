@@ -1,24 +1,34 @@
 package com.gravylab.elasticsearchguide;
 
+import org.elasticsearch.action.admin.cluster.repositories.put.PutRepositoryRequest;
+import org.elasticsearch.action.admin.cluster.snapshots.get.GetSnapshotsRequest;
+import org.elasticsearch.action.admin.cluster.snapshots.get.GetSnapshotsResponse;
+import org.elasticsearch.action.admin.cluster.snapshots.restore.RestoreSnapshotRequest;
+import org.elasticsearch.action.admin.cluster.snapshots.restore.RestoreSnapshotResponse;
+import org.elasticsearch.action.admin.cluster.storedscripts.DeleteStoredScriptRequest;
+import org.elasticsearch.action.admin.cluster.storedscripts.GetStoredScriptRequest;
+import org.elasticsearch.action.admin.cluster.storedscripts.GetStoredScriptResponse;
 import org.elasticsearch.action.admin.cluster.storedscripts.PutStoredScriptRequest;
 import org.elasticsearch.action.get.GetRequest;
 import org.elasticsearch.action.get.GetResponse;
 import org.elasticsearch.action.index.IndexRequest;
-import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.action.search.SearchRequest;
 import org.elasticsearch.action.search.SearchResponse;
+import org.elasticsearch.action.support.master.AcknowledgedResponse;
 import org.elasticsearch.action.update.UpdateRequest;
-import org.elasticsearch.action.update.UpdateResponse;
 import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.indices.AnalyzeRequest;
 import org.elasticsearch.client.indices.AnalyzeResponse;
 import org.elasticsearch.client.indices.CreateIndexRequest;
 import org.elasticsearch.client.indices.CreateIndexResponse;
+import org.elasticsearch.common.bytes.BytesReference;
+import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentFactory;
+import org.elasticsearch.common.xcontent.XContentType;
+import org.elasticsearch.repositories.fs.FsRepository;
 import org.elasticsearch.script.Script;
 import org.elasticsearch.script.ScriptType;
-import org.elasticsearch.script.mustache.SearchTemplateRequest;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.elasticsearch.search.fetch.subphase.highlight.HighlightBuilder;
@@ -47,6 +57,7 @@ public class KoreanAnalyzerTest extends CommonTestClass {
     public static final String NORI_READINGFORM = "nori_readingform";
     public static final String MOVIE_HIGHLIGHTING = "movie_highlighting";
     public static final String MOVIE_SCRIPT = "movie_script";
+    public static final String MOVIE_SEARCH = "movie_search";
 
     @DisplayName("인덱스 생성 시 사용자 정의사전 추가")
     @Test
@@ -300,7 +311,49 @@ public class KoreanAnalyzerTest extends CommonTestClass {
     @DisplayName("Script API 를 이용해 검색 엔진 템플릿을 위한 템플릿 생성")
     @Test
     void create_template_using_script_api() throws Exception {
+        //TODO movie_search_example_template 라는 템플릿이 존재한다면 삭제
+        GetStoredScriptResponse getStoredScriptResponse = dockerClient.getScript(
+                new GetStoredScriptRequest("movie_search_example_template"), RequestOptions.DEFAULT
+        );
+        System.out.println("getStoredScriptResponse = " + getStoredScriptResponse);
 
+
+        DeleteStoredScriptRequest deleteStoredScriptRequest = new DeleteStoredScriptRequest("movie_search_example_template");
+        AcknowledgedResponse response = dockerClient.deleteScript(deleteStoredScriptRequest, RequestOptions.DEFAULT);
+        System.out.println("response = " + response);
+
+
+        //TODO script API 를 이용해 템플릿 생성
+        XContentBuilder builder = XContentFactory.jsonBuilder();
+        builder.startObject();
+        {
+            builder.startObject("script");
+            {
+                builder.field("lang", "mustache");
+                builder.startObject("source");
+                {
+                    builder.startObject("query");
+                    {
+                        builder.startObject("match");
+                        {
+                            builder.field("movieNm", "{{movie_name}}");
+                        }
+                        builder.endObject();
+                    }
+                    builder.endObject();
+                }
+                builder.endObject();
+            }
+            builder.endObject();
+        }
+        builder.endObject();
+
+        PutStoredScriptRequest putStoredScriptRequest = new PutStoredScriptRequest()
+                .id("movie_search_example_template")
+                .content(BytesReference.bytes(builder), XContentType.JSON);
+
+        AcknowledgedResponse acknowledgedResponse = dockerClient.putScript(putStoredScriptRequest, RequestOptions.DEFAULT);
+        assertTrue(acknowledgedResponse.isAcknowledged());
     }
 
 
