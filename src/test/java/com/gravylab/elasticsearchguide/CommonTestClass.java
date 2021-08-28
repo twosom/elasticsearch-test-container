@@ -56,6 +56,7 @@ public class CommonTestClass {
         assertNotNull(container);
         //TODO 프로젝트의 resources 디렉토리에 있는 synonym.txt 를 테스트 컨테이너로 옮기는 작업
         container.execInContainer("mkdir", ELASTICSEARCH_ANALYSIS_DIRECTORY);
+        container.execInContainer("mkdir", "/usr/share/elasticsearch/backup/movie_data_backup");
         container.execInContainer("mv", "/usr/share/elasticsearch/config/synonym.txt", ELASTICSEARCH_ANALYSIS_DIRECTORY);
     }
 

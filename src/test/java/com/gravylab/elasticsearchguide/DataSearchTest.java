@@ -839,43 +839,44 @@ public class DataSearchTest extends CommonTestClass {
     @DisplayName("reindex API 를 사용하 movie_info 인덱스 생성")
     @Test
     void reindex_movie_info_index() throws Exception {
+        //TODO 이미 만들어진 Aliase 가 있다면 삭제 후 재생성
         GetAliasesRequest getAliasesRequest = new GetAliasesRequest("movie");
-        boolean exists = testContainerClient.indices().existsAlias(getAliasesRequest, RequestOptions.DEFAULT);
-        if (exists) {
-            DeleteAliasRequest deleteAliasRequest = new DeleteAliasRequest("movie_search", "movie");
-            org.elasticsearch.client.core.AcknowledgedResponse acknowledgedResponse = dockerClient.indices().deleteAlias(deleteAliasRequest, RequestOptions.DEFAULT);
-            assertTrue(acknowledgedResponse.isAcknowledged());
+        boolean isExists = testContainerClient.indices().existsAlias(getAliasesRequest, RequestOptions.DEFAULT);
+        if (isExists) {
+            DeleteAliasRequest deleteAliasRequest = new DeleteAliasRequest(MOVIE_SEARCH, "movie");
+            org.elasticsearch.client.core.AcknowledgedResponse deleteAliasResponse = testContainerClient.indices().deleteAlias(deleteAliasRequest, RequestOptions.DEFAULT);
+            assertTrue(deleteAliasResponse.isAcknowledged());
         }
+
         restore_snapshot();
-
-
         ReindexRequest reindexRequest = new ReindexRequest()
                 .setSourceIndices(MOVIE_SEARCH)
                 .setDestIndex("movie_info");
 
         testContainerClient.reindex(reindexRequest, RequestOptions.DEFAULT);
 
-        //TODO 인덱스가 만들어지면 _aliases 를 통해 두 인덱스를 movie 라는 별칭으로 만들기
-        IndicesAliasesRequest indicesAliasesRequest = new IndicesAliasesRequest();
+        Thread.sleep(2000);
 
-        IndicesAliasesRequest.AliasActions action1 = new IndicesAliasesRequest.AliasActions(IndicesAliasesRequest.AliasActions.Type.ADD)
+        IndicesAliasesRequest indicesAliasesRequest = new IndicesAliasesRequest();
+        IndicesAliasesRequest.AliasActions movieSearchAlias = new IndicesAliasesRequest.AliasActions(IndicesAliasesRequest.AliasActions.Type.ADD)
                 .index(MOVIE_SEARCH)
                 .alias("movie");
 
-        IndicesAliasesRequest.AliasActions action2 = new IndicesAliasesRequest.AliasActions(IndicesAliasesRequest.AliasActions.Type.ADD)
+
+        IndicesAliasesRequest.AliasActions movieInfoAlias = new IndicesAliasesRequest.AliasActions(IndicesAliasesRequest.AliasActions.Type.ADD)
                 .index("movie_info")
                 .alias("movie");
 
 
-        indicesAliasesRequest.addAliasAction(action1)
-                .addAliasAction(action2);
+        indicesAliasesRequest.addAliasAction(movieSearchAlias)
+                .addAliasAction(movieInfoAlias);
 
         AcknowledgedResponse acknowledgedResponse = testContainerClient.indices().updateAliases(indicesAliasesRequest, RequestOptions.DEFAULT);
         assertTrue(acknowledgedResponse.isAcknowledged());
 
 
         SearchRequest searchRequest = new SearchRequest("movie");
-        SearchResponse searchResponse = dockerClient.search(searchRequest, RequestOptions.DEFAULT);
+        SearchResponse searchResponse = testContainerClient.search(searchRequest, RequestOptions.DEFAULT);
         System.out.println("searchResponse = " + searchResponse);
     }
 
