@@ -1259,5 +1259,4 @@ public class KoreanPluginTest extends CommonTestClass {
     }
 
 
-
 }

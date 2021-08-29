@@ -37,6 +37,7 @@ import static org.elasticsearch.index.query.QueryBuilders.matchQuery;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
+ * 테스트 환경 : ElasticSearch 7.14.0
  * 사전에 Docker 를 실행 후 각각의 인스턴스에 analysis-nori 플러그인을 설치해준다.
  */
 public class KoreanAnalyzerTest extends CommonTestClass {
@@ -46,11 +47,9 @@ public class KoreanAnalyzerTest extends CommonTestClass {
     public static final String TOKENIZER_NAME = "nori_user_dict_tokenizer";
     public static final String DECOMPOUND_MODE = "decompound_mode";
     public static final String ANALYZER_NAME = "nori_token_analyzer";
-    public static final String NORI_PART_OF_SPEECH = "nori_part_of_speech";
     public static final String NORI_READINGFORM = "nori_readingform";
     public static final String MOVIE_HIGHLIGHTING = "movie_highlighting";
     public static final String MOVIE_SCRIPT = "movie_script";
-    public static final String MOVIE_SEARCH = "movie_search";
 
     @DisplayName("인덱스 생성 시 사용자 정의사전 추가")
     @Test
